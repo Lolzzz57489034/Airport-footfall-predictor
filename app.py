@@ -14,9 +14,8 @@ df = pd.read_csv(file_path)
 # Ensure 'Date' is in datetime format
 df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
 
-# Extract 'Year' and ensure it's an integer
-df["Year"] = df["Date"].dt.year
-df["Year"] = df["Year"].fillna(df["Year"].mode()[0]).astype(int)  # Fill missing values & convert to int
+# Extract 'Year' as integer
+df["Year"] = df["Date"].dt.year.fillna(df["Date"].dt.year.mode()[0]).astype(int)
 
 # Encode categorical features
 label_encoders = {}
@@ -24,10 +23,10 @@ categorical_cols = ["Season", "Weather_Good", "Economic_Trend", "Airport"]
 for col in categorical_cols:
     le = LabelEncoder()
     df[col] = le.fit_transform(df[col])
-    label_encoders[col] = le  # Store for future inverse transform
+    label_encoders[col] = le  # Store for future use
 
 # Prepare dataset for ML
-X = df[["Year", "Month", "Airport", "Season", "Weather_Good", "Economic_Trend", "Total_Flights"]]
+X = df[["Year", "Airport", "Season", "Weather_Good", "Economic_Trend", "Total_Flights"]]
 y = df["Actual_Footfall"]
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -46,25 +45,26 @@ st.subheader("\U0001F52E Predict Future Airport Footfall")
 # Ensure max year is valid before using in slider
 if df["Year"].max() > 0:
     future_year = st.slider("Select Future Year:", min_value=df["Year"].max() + 1, max_value=df["Year"].max() + 10, step=1)
-    future_month = st.slider("Select Month:", min_value=1, max_value=12, step=1)
-    departure_airport = st.selectbox("Select Departure Airport:", df["Airport"].unique())
-    arrival_airport = st.selectbox("Select Arrival Airport:", df["Airport"].unique())
+    selected_airport = st.selectbox("Select Airport:", df["Airport"].unique())
 
     # Predict button
     if st.button("\U0001F680 Predict"):
         # Encode input values
-        dep_airport_encoded = label_encoders["Airport"].transform([departure_airport])[0]
-        arr_airport_encoded = label_encoders["Airport"].transform([arrival_airport])[0]
-        
+        if selected_airport in label_encoders["Airport"].classes_:
+            airport_encoded = label_encoders["Airport"].transform([selected_airport])[0]
+        else:
+            st.error("❌ Selected airport not found in dataset!")
+            st.stop()
+
         # Prepare input for prediction
-        input_data = np.array([[future_year, future_month, dep_airport_encoded, arr_airport_encoded, 1, 1, 100]])
-        
+        input_data = np.array([[future_year, airport_encoded, 1, 1, 1, 100]])
+
         # Predict Footfall
         predicted_footfall = model.predict(input_data)[0]
-        
+
         # Display Prediction
         st.subheader(f"\U0001F4CA Predicted Footfall: **{int(predicted_footfall)} passengers**")
-        
+
         # Visualization
         plt.figure(figsize=(8, 5))
         sns.lineplot(x=df["Year"], y=df["Actual_Footfall"], marker="o", label="Past Data")
