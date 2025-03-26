@@ -6,6 +6,7 @@ import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import LabelEncoder
+import random
 
 # Load dataset
 file_path = "Airport_Flight_Data_Final_Updated.csv"
@@ -45,19 +46,31 @@ st.subheader("\U0001F52E Predict Future Airport Footfall")
 # Ensure max year is valid before using in slider
 if df["Year"].max() > 0:
     future_year = st.slider("Select Future Year:", min_value=df["Year"].max() + 1, max_value=df["Year"].max() + 10, step=1)
-    selected_airport = st.selectbox("Select Airport:", df["Airport"].unique())
-
+    
+    # Randomly select departure and arrival airports from dataset
+    departure_airport = random.choice(df["Airport"].unique())
+    arrival_airport = random.choice(df["Airport"].unique())
+    
+    st.write(f"✈️ Departure Airport: {departure_airport}")
+    st.write(f"🛬 Arrival Airport: {arrival_airport}")
+    
     # Predict button
     if st.button("\U0001F680 Predict"):
         # Encode input values
-        if selected_airport in label_encoders["Airport"].classes_:
-            airport_encoded = label_encoders["Airport"].transform([selected_airport])[0]
+        if departure_airport in label_encoders["Airport"].classes_:
+            dep_airport_encoded = label_encoders["Airport"].transform([departure_airport])[0]
         else:
-            st.error("❌ Selected airport not found in dataset!")
+            st.error("❌ Selected departure airport not found in dataset!")
+            st.stop()
+
+        if arrival_airport in label_encoders["Airport"].classes_:
+            arr_airport_encoded = label_encoders["Airport"].transform([arrival_airport])[0]
+        else:
+            st.error("❌ Selected arrival airport not found in dataset!")
             st.stop()
 
         # Prepare input for prediction
-        input_data = np.array([[future_year, airport_encoded, 1, 1, 1, 100]])
+        input_data = np.array([[future_year, dep_airport_encoded, arr_airport_encoded, 1, 1, 100]])
 
         # Predict Footfall
         predicted_footfall = model.predict(input_data)[0]
