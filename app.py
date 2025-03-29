@@ -15,8 +15,13 @@ df = pd.read_csv(file_path)
 # Ensure 'Date' is in datetime format
 df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
 
-# Extract 'Year' as integer
-df["Year"] = df["Date"].dt.year.fillna(df["Date"].dt.year.mode()[0]).astype(int)
+# Extract 'Year' as integer with proper mode handling
+most_common_year = df["Date"].dt.year.mode()
+if not most_common_year.empty:
+    df["Year"] = df["Date"].dt.year.fillna(most_common_year[0]).astype(int)
+else:
+    st.error("❌ No valid years found in the dataset!")
+    st.stop()
 
 # Encode categorical features
 label_encoders = {}
@@ -44,15 +49,18 @@ st.title("\U00002708 Airport Footfall Prediction")
 st.subheader("\U0001F52E Predict Future Airport Footfall")
 
 # Ensure max year is valid before using in slider
-if df["Year"].max() > 0:
-    future_year = st.slider("Select Future Year:", min_value=df["Year"].max() + 1, max_value=df["Year"].max() + 10, step=1)
+max_year = df["Year"].max()
+if pd.notna(max_year) and max_year > 0:
+    future_year = st.slider("Select Future Year:", min_value=max_year + 1, max_value=max_year + 10, step=1)
     
-    # Randomly select departure and arrival airports from dataset
-    departure_airport = random.choice(df["Airport"].unique())
-    arrival_airport = random.choice(df["Airport"].unique())
+    # Randomly select a departure airport
+    departure_airport = st.selectbox("Select Departure Airport:", df["Airport"].unique())
     
-    st.write(f"✈️ Departure Airport: {departure_airport}")
-    st.write(f"🛬 Arrival Airport: {arrival_airport}")
+    # Allow user input for categorical features
+    season = st.selectbox("Select Season:", df["Season"].unique())
+    weather_good = st.selectbox("Weather Condition (Good=1, Bad=0):", [0, 1])
+    economic_trend = st.selectbox("Economic Trend (Good=1, Bad=0):", [0, 1])
+    total_flights = st.number_input("Estimated Total Flights:", min_value=1, value=int(df["Total_Flights"].mean()))
     
     # Predict button
     if st.button("\U0001F680 Predict"):
@@ -63,15 +71,9 @@ if df["Year"].max() > 0:
             st.error("❌ Selected departure airport not found in dataset!")
             st.stop()
 
-        if arrival_airport in label_encoders["Airport"].classes_:
-            arr_airport_encoded = label_encoders["Airport"].transform([arrival_airport])[0]
-        else:
-            st.error("❌ Selected arrival airport not found in dataset!")
-            st.stop()
-
         # Prepare input for prediction
-        input_data = np.array([[future_year, dep_airport_encoded, arr_airport_encoded, 1, 1, 100]])
-
+        input_data = np.array([[future_year, dep_airport_encoded, season, weather_good, economic_trend, total_flights]])
+        
         # Predict Footfall
         predicted_footfall = model.predict(input_data)[0]
 
