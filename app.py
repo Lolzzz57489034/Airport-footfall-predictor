@@ -1,77 +1,69 @@
+import streamlit as st
 import pandas as pd
 import numpy as np
-import streamlit as st
+import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-import matplotlib.pyplot as plt
 
-# Load the dataset
+# Load Data
 def load_data():
-    try:
-        df = pd.read_csv("Airport_Flight_Data_Final_Updated.csv")
-        if "Date" in df.columns:
-            df["Date"] = pd.to_datetime(df["Date"], errors='coerce')
-        return df
-    except Exception as e:
-        st.error(f"Error loading data: {e}")
-        return None
+    df = pd.read_csv("Airport_Flight_Data_Final_Updated.csv")
+    df["Date"] = pd.to_datetime(df["Date"], dayfirst=True)
+    return df
 
-# Train the ML model
-def train_model(df):
-    if df is None:
-        return None
+# Preprocess Data
+def preprocess_data(df):
+    # Selecting relevant features for ML model
+    features = ["Temperature", "Total_Flights", "Domestic_Flights", "International_Flights", "Load_Factor (%)", "Weather_Good", "Economic_Trend", "Is_Weekend", "Peak_Season", "Holiday"]
+    target = "Actual_Footfall"
     
-    required_columns = ["Season", "Flight_Type", "Total_Flights", "Passengers"]
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    if missing_columns:
-        st.error(f"Missing columns in dataset: {missing_columns}")
-        return None
-    
-    df = pd.get_dummies(df, columns=["Season", "Flight_Type"], drop_first=True)
-    
-    X = df.drop(columns=["Passengers"])
-    y = df["Passengers"]
+    df = df.dropna()  # Handle missing values
+    X = df[features]
+    y = df[target]
+    return X, y, df
+
+# Train Model
+def train_model(X, y):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    
     model = LinearRegression()
     model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
     
-    predictions = model.predict(X_test)
-    mae = mean_absolute_error(y_test, predictions)
-    mse = mean_squared_error(y_test, predictions)
+    # Model Performance
+    mae = mean_absolute_error(y_test, y_pred)
+    mse = mean_squared_error(y_test, y_pred)
+    rmse = np.sqrt(mse)
     
-    st.write(f"Model Trained! MAE: {mae}, MSE: {mse}")
-    return model
+    return model, mae, rmse
 
-# Predict future footfalls
+# Predict Future Footfall
 def predict_future(model, df):
-    if model is None or df is None:
-        return None
-    
-    future_dates = pd.date_range(start=df["Date"].max(), periods=30, freq='D')
-    future_df = pd.DataFrame({"Date": future_dates})
-    future_df["Total_Flights"] = df["Total_Flights"].mean()
-    
-    future_df = pd.get_dummies(future_df, columns=["Season", "Flight_Type"], drop_first=True)
-    
-    for col in df.columns:
-        if col not in future_df.columns and col != "Passengers":
-            future_df[col] = 0
-    
-    future_passengers = model.predict(future_df.drop(columns=["Date"], errors='ignore'))
-    future_df["Predicted_Passengers"] = future_passengers
-    
-    return future_df
+    future_X = df[["Temperature", "Total_Flights", "Domestic_Flights", "International_Flights", "Load_Factor (%)", "Weather_Good", "Economic_Trend", "Is_Weekend", "Peak_Season", "Holiday"]]
+    df["Predicted_Footfall"] = model.predict(future_X)
+    return df
 
-# Main Streamlit App
+# Streamlit App
+st.title("Airport Footfall Prediction Dashboard ✈️")
 df = load_data()
-if df is not None:
-    st.title("Airport Footfall Predictor")
-    
-    model = train_model(df)
-    future_predictions = predict_future(model, df)
-    
-    if future_predictions is not None:
-        st.subheader("Future Passenger Predictions")
-        st.line_chart(future_predictions.set_index("Date")["Predicted_Passengers"])
+X, y, df = preprocess_data(df)
+model, mae, rmse = train_model(X, y)
+df = predict_future(model, df)
+
+# Visualization
+st.subheader("📊 Predicted vs Actual Footfall")
+plt.figure(figsize=(10, 5))
+plt.plot(df["Date"], df["Actual_Footfall"], label="Actual Footfall", marker="o", linestyle="-")
+plt.plot(df["Date"], df["Predicted_Footfall"], label="Predicted Footfall", marker="x", linestyle="-")
+plt.xlabel("Date")
+plt.ylabel("Footfall Count")
+plt.legend()
+st.pyplot(plt)
+
+# Display Metrics
+st.write(f"Mean Absolute Error: {mae:.2f}")
+st.write(f"Root Mean Squared Error: {rmse:.2f}")
+
+# Show Data
+st.subheader("📂 Preview Data")
+st.write(df.head())
