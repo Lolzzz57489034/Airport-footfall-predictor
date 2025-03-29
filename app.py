@@ -7,18 +7,24 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import LabelEncoder
 import requests
-import io
 
-# Load dataset from GitHub
-url = "https://raw.githubusercontent.com/Lolzzz57489034/Airport-footfall-predictor/main/Airport_Flight_Data_Final_Updated.csv"
-response = requests.get(url)
-df = pd.read_csv(io.StringIO(response.text))
+# Load dataset from GitHub repository
+github_url = "https://raw.githubusercontent.com/Lolzzz57489034/Airport-footfall-predictor/main/Airport_Flight_Data_Final_Updated.csv"
+df = pd.read_csv(github_url)
 
 # Ensure 'Date' is in datetime format
 df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-
-# Extract 'Year' as integer
 df["Year"] = df["Date"].dt.year.fillna(df["Date"].dt.year.mode()[0]).astype(int)
+
+# Define airport names
+airport_names = [
+    "Rajiv Gandhi International Airport",
+    "Chhatrapati Shivaji Maharaj International Airport",
+    "Indira Gandhi International Airport",
+    "Kempegowda International Airport",
+    "Sardar Vallabhbhai Patel International Airport",
+    "Chennai International Airport"
+]
 
 # Encode categorical features
 label_encoders = {}
@@ -26,12 +32,11 @@ categorical_cols = ["Season", "Weather_Good", "Economic_Trend", "Airport"]
 for col in categorical_cols:
     le = LabelEncoder()
     df[col] = le.fit_transform(df[col])
-    label_encoders[col] = le  # Store for future use
+    label_encoders[col] = le
 
 # Prepare dataset for ML
 X = df[["Year", "Airport", "Season", "Weather_Good", "Economic_Trend", "Total_Flights"]]
 y = df["Actual_Footfall"]
-
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 # Train ML Model
@@ -42,31 +47,33 @@ model.fit(X_train, y_train)
 st.set_page_config(page_title="Airport Footfall Predictor", layout="wide")
 st.title("\U00002708 Airport Footfall Prediction")
 
-# User Inputs
-airport_list = df["Airport"].unique()
-selected_airport = st.selectbox("Select Airport:", airport_list)
+# Dropdown for airport selection
+selected_airport = st.selectbox("Select Airport:", airport_names)
 
-season_list = ["Monsoon", "Summer", "Winter"]
-selected_season = st.selectbox("Select Season:", season_list)
+# Map selected airport to encoded value
+if selected_airport in label_encoders["Airport"].classes_:
+    selected_airport_encoded = label_encoders["Airport"].transform([selected_airport])[0]
+else:
+    st.error("Selected airport not found in dataset!")
+    st.stop()
 
-flight_type = st.radio("Flight Type:", ["Domestic", "International"])
+# Dropdown for season selection
+selected_season = st.selectbox("Select Season:", ["Monsoon", "Summer", "Winter"])
+selected_season_encoded = label_encoders["Season"].transform([selected_season])[0]
 
+# Dropdown for flight type selection
+flight_type = st.selectbox("Select Flight Type:", ["Domestic", "International"])
+flight_type_encoded = 1 if flight_type == "Domestic" else 0
+
+# Select future year
 future_year = st.slider("Select Future Year:", min_value=df["Year"].max() + 1, max_value=df["Year"].max() + 10, step=1)
 
 # Predict button
 if st.button("\U0001F680 Predict"):
-    # Encode input values
-    if selected_airport in label_encoders["Airport"].classes_:
-        airport_encoded = label_encoders["Airport"].transform([selected_airport])[0]
-    else:
-        st.error("❌ Selected airport not found in dataset!")
-        st.stop()
-    
-    season_encoded = label_encoders["Season"].transform([selected_season])[0]
-    flight_encoded = 1 if flight_type == "Domestic" else 0  # Assuming binary encoding
-    
     # Prepare input for prediction
-    input_data = np.array([[future_year, airport_encoded, season_encoded, 1, 1, 100]])
+    input_data = np.array([[future_year, selected_airport_encoded, selected_season_encoded, 1, 1, 100]])
+
+    # Predict Footfall
     predicted_footfall = model.predict(input_data)[0]
 
     # Display Prediction
