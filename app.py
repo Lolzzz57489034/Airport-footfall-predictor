@@ -11,6 +11,13 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 @st.cache_data
 def load_data():
     df = pd.read_csv("Airport_Flight_Data_Final_Updated.csv")
+    
+    # Ensure 'Date' column is in datetime format
+    df["Date"] = pd.to_datetime(df["Date"], errors='coerce')
+    
+    # Drop rows with invalid dates
+    df = df.dropna(subset=["Date"])
+    
     return df
 
 df = load_data()
@@ -44,7 +51,7 @@ else:
 
 # Prepare data for ML model
 if not filtered_df.empty:
-    filtered_df["Year"] = pd.to_datetime(filtered_df["Date"]).dt.year
+    filtered_df["Year"] = filtered_df["Date"].dt.year.astype(int)
     X = filtered_df[["Year"]]
     y = filtered_df[target_column]
     
