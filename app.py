@@ -12,39 +12,49 @@ import random
 file_path = "Airport_Flight_Data_Final_Updated.csv"
 df = pd.read_csv(file_path)
 
-# Convert 'Date' to datetime and extract 'Year'
+# Ensure 'Date' column exists and is in datetime format
 df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-df["Year"] = df["Date"].dt.year
+df.dropna(subset=["Date"], inplace=True)
+df["Year"] = df["Date"].dt.year.astype(int)
 
-# Define airport list dynamically from dataset
-airport_list = df["Airport"].unique().tolist()
+# Filter dataset based on provided airports
+airports = [
+    "Rajiv Gandhi International Airport", 
+    "Chhatrapati Shivaji Maharaj International Airport", 
+    "Indira Gandhi International Airport", 
+    "Kempegowda International Airport", 
+    "Sardar Vallabhbhai Patel International Airport", 
+    "Chennai International Airport"
+]
+df = df[df["Airport"].isin(airports)]
 
 # Streamlit UI
 st.set_page_config(page_title="Airport Footfall Predictor", layout="wide")
 st.title("\U00002708 Airport Footfall Prediction")
 
 # User selects an airport
-selected_airport = st.selectbox("Select an Airport:", airport_list)
+selected_airport = st.selectbox("Select an Airport:", airports)
 
 # Filter dataset based on selected airport
 df_airport = df[df["Airport"] == selected_airport]
 
 # User selects a season
-season_list = ["Winter", "Monsoon", "Summer"]
-selected_season = st.selectbox("Select a Season:", season_list)
+seasons = ["Monsoon", "Summer", "Winter"]
+selected_season = st.selectbox("Select a Season:", seasons)
 
 # User selects flight type
 flight_type = st.radio("Select Flight Type:", ["Domestic", "International"])
 
 # Extract relevant features
-X = df[["Year", "Season", "Total_Flights", "Domestic_Flights", "International_Flights", "Load_Factor (%)", "Economic_Trend"]]
+features = ["Year", "Season", "Total_Flights", "Domestic_Flights", "International_Flights", "Load_Factor (%)", "Economic_Trend"]
+X = df[features]
 y = df["Actual_Footfall"]
 
 # Encode categorical features
 label_encoders = {}
 for col in ["Season"]:
     le = LabelEncoder()
-    X[col] = le.fit_transform(X[col])
+    df[col] = le.fit_transform(df[col])
     label_encoders[col] = le
 
 # Train ML Model
@@ -52,8 +62,9 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 model = RandomForestRegressor(n_estimators=100, random_state=42)
 model.fit(X_train, y_train)
 
-# Predict future footfall
-future_year = st.slider("Select Future Year:", min_value=df["Year"].max() + 1, max_value=df["Year"].max() + 10, step=1)
+# Ensure max_year is valid
+max_year = int(df["Year"].max())
+future_year = st.slider("Select Future Year:", min_value=max_year + 1, max_value=max_year + 10, step=1)
 
 # Prepare input for prediction
 season_encoded = label_encoders["Season"].transform([selected_season])[0]
