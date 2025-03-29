@@ -12,82 +12,74 @@ import random
 file_path = "Airport_Flight_Data_Final_Updated.csv"
 df = pd.read_csv(file_path)
 
-# Ensure 'Date' is in datetime format
+# Convert 'Date' to datetime and extract 'Year'
 df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+df["Year"] = df["Date"].dt.year
 
-# Extract 'Year' as integer with proper mode handling
-most_common_year = df["Date"].dt.year.mode()
-if not most_common_year.empty:
-    df["Year"] = df["Date"].dt.year.fillna(most_common_year[0]).astype(int)
-else:
-    st.error("❌ No valid years found in the dataset!")
-    st.stop()
-
-# Encode categorical features
-label_encoders = {}
-categorical_cols = ["Season", "Weather_Good", "Economic_Trend", "Airport"]
-for col in categorical_cols:
-    le = LabelEncoder()
-    df[col] = le.fit_transform(df[col])
-    label_encoders[col] = le  # Store for future use
-
-# Prepare dataset for ML
-X = df[["Year", "Airport", "Season", "Weather_Good", "Economic_Trend", "Total_Flights"]]
-y = df["Actual_Footfall"]
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# Train ML Model
-model = RandomForestRegressor(n_estimators=100, random_state=42)
-model.fit(X_train, y_train)
+# Define airport list dynamically from dataset
+airport_list = df["Airport"].unique().tolist()
 
 # Streamlit UI
 st.set_page_config(page_title="Airport Footfall Predictor", layout="wide")
 st.title("\U00002708 Airport Footfall Prediction")
 
-# Future Footfall Prediction
-st.subheader("\U0001F52E Predict Future Airport Footfall")
+# User selects an airport
+selected_airport = st.selectbox("Select an Airport:", airport_list)
 
-# Ensure max year is valid before using in slider
-max_year = df["Year"].max()
-if pd.notna(max_year) and max_year > 0:
-    future_year = st.slider("Select Future Year:", min_value=max_year + 1, max_value=max_year + 10, step=1)
-    
-    # Randomly select a departure airport
-    departure_airport = st.selectbox("Select Departure Airport:", df["Airport"].unique())
-    
-    # Allow user input for categorical features
-    season = st.selectbox("Select Season:", df["Season"].unique())
-    weather_good = st.selectbox("Weather Condition (Good=1, Bad=0):", [0, 1])
-    economic_trend = st.selectbox("Economic Trend (Good=1, Bad=0):", [0, 1])
-    total_flights = st.number_input("Estimated Total Flights:", min_value=1, value=int(df["Total_Flights"].mean()))
-    
-    # Predict button
-    if st.button("\U0001F680 Predict"):
-        # Encode input values
-        if departure_airport in label_encoders["Airport"].classes_:
-            dep_airport_encoded = label_encoders["Airport"].transform([departure_airport])[0]
-        else:
-            st.error("❌ Selected departure airport not found in dataset!")
-            st.stop()
+# Filter dataset based on selected airport
+df_airport = df[df["Airport"] == selected_airport]
 
-        # Prepare input for prediction
-        input_data = np.array([[future_year, dep_airport_encoded, season, weather_good, economic_trend, total_flights]])
-        
-        # Predict Footfall
-        predicted_footfall = model.predict(input_data)[0]
+# User selects a season
+season_list = ["Winter", "Monsoon", "Summer"]
+selected_season = st.selectbox("Select a Season:", season_list)
 
-        # Display Prediction
-        st.subheader(f"\U0001F4CA Predicted Footfall: **{int(predicted_footfall)} passengers**")
+# User selects flight type
+flight_type = st.radio("Select Flight Type:", ["Domestic", "International"])
 
-        # Visualization
-        plt.figure(figsize=(8, 5))
-        sns.lineplot(x=df["Year"], y=df["Actual_Footfall"], marker="o", label="Past Data")
-        plt.axvline(x=future_year, color="r", linestyle="--", label="Prediction Point")
-        plt.scatter(future_year, predicted_footfall, color="red", s=100, label="Predicted Footfall")
-        plt.xlabel("Year")
-        plt.ylabel("Passenger Footfall")
-        plt.legend()
-        st.pyplot(plt)
+# Extract relevant features
+X = df[["Year", "Season", "Total_Flights", "Domestic_Flights", "International_Flights", "Load_Factor (%)", "Economic_Trend"]]
+y = df["Actual_Footfall"]
+
+# Encode categorical features
+label_encoders = {}
+for col in ["Season"]:
+    le = LabelEncoder()
+    X[col] = le.fit_transform(X[col])
+    label_encoders[col] = le
+
+# Train ML Model
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+model = RandomForestRegressor(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+# Predict future footfall
+future_year = st.slider("Select Future Year:", min_value=df["Year"].max() + 1, max_value=df["Year"].max() + 10, step=1)
+
+# Prepare input for prediction
+season_encoded = label_encoders["Season"].transform([selected_season])[0]
+if flight_type == "Domestic":
+    domestic_flights = int(df_airport["Domestic_Flights"].mean())
+    international_flights = 0
 else:
-    st.error("❌ Error: No valid years found in the dataset!")
+    domestic_flights = 0
+    international_flights = int(df_airport["International_Flights"].mean())
+
+total_flights = domestic_flights + international_flights
+load_factor = df_airport["Load_Factor (%)"].mean()
+economic_trend = df_airport["Economic_Trend"].mean()
+
+input_data = np.array([[future_year, season_encoded, total_flights, domestic_flights, international_flights, load_factor, economic_trend]])
+predicted_footfall = model.predict(input_data)[0]
+
+# Display Prediction
+st.subheader(f"\U0001F4CA Predicted Footfall: **{int(predicted_footfall)} passengers**")
+
+# Visualization
+plt.figure(figsize=(8, 5))
+sns.lineplot(x=df_airport["Year"], y=df_airport["Actual_Footfall"], marker="o", label="Past Data")
+plt.axvline(x=future_year, color="r", linestyle="--", label="Prediction Point")
+plt.scatter(future_year, predicted_footfall, color="red", s=100, label="Predicted Footfall")
+plt.xlabel("Year")
+plt.ylabel("Passenger Footfall")
+plt.legend()
+st.pyplot(plt)
