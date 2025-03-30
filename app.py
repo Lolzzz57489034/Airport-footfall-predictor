@@ -9,7 +9,7 @@ from sklearn.preprocessing import LabelEncoder
 
 # Load dataset from GitHub repository
 github_url = "https://raw.githubusercontent.com/Lolzzz57489034/Airport-footfall-predictor/main/Airport_Flight_Data_Final_Updated.csv"
-df = pd.read_csv(github_url)
+df = pd.read_csv(Airport_Flight_Data_Final_Updated.csv)
 
 # Ensure 'Date' is in datetime format
 df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
