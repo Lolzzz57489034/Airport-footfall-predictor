@@ -92,8 +92,13 @@ if st.checkbox("Predict Revenue Based on Footfall"):
     revenue_model = RandomForestRegressor(n_estimators=100, random_state=42)
     revenue_model.fit(X_train_revenue, y_train_revenue)
     
-    # Predict Revenue
-    predicted_revenue_values = revenue_model.predict(np.array(predicted_footfall_values).reshape(-1, 1))
+    # Estimate Total Flights for Future Years (using mean of historical data)
+    avg_flights = int(df["Total_Flights"].mean())
+    future_flight_estimates = [avg_flights] * len(future_years)
+    
+    # Predict Revenue with Footfall and Estimated Flights
+    revenue_input_data = np.column_stack((predicted_footfall_values, future_flight_estimates))
+    predicted_revenue_values = revenue_model.predict(revenue_input_data)
     
     # Display Revenue Prediction Results
     st.subheader("\U0001F4B0 Predicted Revenue for Next 10 Years")
