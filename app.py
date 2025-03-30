@@ -30,7 +30,6 @@ label_encoders = {}
 categorical_cols = ["Season", "Weather_Good", "Economic_Trend", "Airport"]
 for col in categorical_cols:
     le = LabelEncoder()
-    df[col] = df[col].astype(str)  # Ensure it's string before encoding
     df[col] = le.fit_transform(df[col])
     label_encoders[col] = le
 
@@ -38,32 +37,17 @@ for col in categorical_cols:
 df["Revenue"] = df["Actual_Footfall"] * np.random.uniform(20, 50, size=len(df))
 
 # Prepare dataset for ML
-X = df[["Year", "Airport", "Season", "Weather_Good", "Economic_Trend", "Total_Flights", "Actual_Footfall"]]
-y = df["Revenue"]
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+X_footfall = df[["Year", "Airport", "Season", "Weather_Good", "Economic_Trend", "Total_Flights"]]
+y_footfall = df["Actual_Footfall"]
+X_train_footfall, X_test_footfall, y_train_footfall, y_test_footfall = train_test_split(X_footfall, y_footfall, test_size=0.2, random_state=42)
 
-# Train ML Model
-model = RandomForestRegressor(n_estimators=100, random_state=42)
-model.fit(X_train, y_train)
+# Train Footfall Prediction Model
+footfall_model = RandomForestRegressor(n_estimators=100, random_state=42)
+footfall_model.fit(X_train_footfall, y_train_footfall)
 
 # Streamlit UI
-st.set_page_config(page_title="Airport Revenue Predictor", layout="wide")
-
-# Add Custom Background Image
-background_url = "https://images.pexels.com/photos/956999/pexels-photo-956999.jpeg"
-st.markdown(
-    f"""
-    <style>
-    .stApp {{
-        background: url({background_url}) no-repeat center center fixed;
-        background-size: cover;
-    }}
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-st.title("\U0001F4B0 Airport Revenue Prediction")
+st.set_page_config(page_title="Airport Footfall & Revenue Predictor", layout="wide")
+st.title("\U0001F6EB Airport Footfall & Revenue Prediction")
 
 # Dropdown for airport selection
 selected_airport = st.selectbox("Select Airport:", airport_names)
@@ -76,37 +60,52 @@ else:
     st.stop()
 
 # Dropdown for season selection
-seasons = list(label_encoders["Season"].classes_)
-selected_season = st.selectbox("Select Season:", seasons)
+selected_season = st.selectbox("Select Season:", ["Monsoon", "Summer", "Winter"])
 selected_season_encoded = label_encoders["Season"].transform([selected_season])[0]
 
-# Select future year
-future_year = st.slider("Select Future Year:", min_value=df["Year"].max() + 1, max_value=df["Year"].max() + 10, step=1)
+# Predict Footfall for Next 10 Years
+future_years = list(range(df["Year"].max() + 1, df["Year"].max() + 11))
+predicted_footfall_values = []
+for year in future_years:
+    input_data = np.array([[year, selected_airport_encoded, selected_season_encoded, 1, 1, 1000]])
+    predicted_footfall = footfall_model.predict(input_data)[0]
+    predicted_footfall_values.append(predicted_footfall)
 
-# Input for projected flight volume and footfall
-projected_flights = st.number_input("Projected Flights:", min_value=100, max_value=5000, step=50, value=1000)
-projected_footfall = st.number_input("Projected Footfall:", min_value=1000, max_value=1000000, step=5000, value=50000)
+# Display Footfall Prediction Results
+st.subheader("\U0001F4CA Predicted Footfall for Next 10 Years")
+predicted_footfall_df = pd.DataFrame({"Year": future_years, "Predicted Footfall": predicted_footfall_values})
+st.dataframe(predicted_footfall_df)
 
-# Predict button
-if st.button("\U0001F680 Predict"):
-    try:
-        # Prepare input for prediction
-        input_data = np.array([[future_year, selected_airport_encoded, selected_season_encoded, 1, 1, projected_flights, projected_footfall]])
-        
-        # Predict Revenue
-        predicted_revenue = model.predict(input_data)[0]
+# Visualization for Footfall Prediction
+plt.figure(figsize=(8, 5))
+sns.lineplot(x=predicted_footfall_df["Year"], y=predicted_footfall_df["Predicted Footfall"], marker="o", label="Predicted Footfall")
+plt.xlabel("Year")
+plt.ylabel("Passenger Footfall")
+plt.legend()
+st.pyplot(plt)
 
-        # Display Prediction
-        st.subheader(f"\U0001F4CA Predicted Revenue: *${predicted_revenue:,.2f}*")
-
-        # Visualization
-        plt.figure(figsize=(8, 5))
-        sns.lineplot(x=df["Year"], y=df["Revenue"], marker="o", label="Past Revenue")
-        plt.axvline(x=future_year, color="r", linestyle="--", label="Prediction Point")
-        plt.scatter(future_year, predicted_revenue, color="red", s=100, label="Predicted Revenue")
-        plt.xlabel("Year")
-        plt.ylabel("Revenue ($)")
-        plt.legend()
-        st.pyplot(plt)
-    except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
+# Option to Predict Revenue
+if st.checkbox("Predict Revenue Based on Footfall"):
+    # Train Revenue Prediction Model
+    X_revenue = df[["Actual_Footfall", "Total_Flights"]]
+    y_revenue = df["Revenue"]
+    X_train_revenue, X_test_revenue, y_train_revenue, y_test_revenue = train_test_split(X_revenue, y_revenue, test_size=0.2, random_state=42)
+    
+    revenue_model = RandomForestRegressor(n_estimators=100, random_state=42)
+    revenue_model.fit(X_train_revenue, y_train_revenue)
+    
+    # Predict Revenue
+    predicted_revenue_values = revenue_model.predict(np.array(predicted_footfall_values).reshape(-1, 1))
+    
+    # Display Revenue Prediction Results
+    st.subheader("\U0001F4B0 Predicted Revenue for Next 10 Years")
+    predicted_revenue_df = pd.DataFrame({"Year": future_years, "Predicted Revenue ($)": predicted_revenue_values})
+    st.dataframe(predicted_revenue_df)
+    
+    # Visualization for Revenue Prediction
+    plt.figure(figsize=(8, 5))
+    sns.lineplot(x=predicted_revenue_df["Year"], y=predicted_revenue_df["Predicted Revenue ($)"], marker="o", label="Predicted Revenue")
+    plt.xlabel("Year")
+    plt.ylabel("Revenue ($)")
+    plt.legend()
+    st.pyplot(plt)
