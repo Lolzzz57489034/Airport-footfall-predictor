@@ -48,6 +48,21 @@ model.fit(X_train, y_train)
 
 # Streamlit UI
 st.set_page_config(page_title="Airport Revenue Predictor", layout="wide")
+
+# Add Custom Background Image
+background_url = "https://images.pexels.com/photos/956999/pexels-photo-956999.jpeg"
+st.markdown(
+    f"""
+    <style>
+    .stApp {{
+        background: url({background_url}) no-repeat center center fixed;
+        background-size: cover;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 st.title("\U0001F4B0 Airport Revenue Prediction")
 
 # Dropdown for airport selection
