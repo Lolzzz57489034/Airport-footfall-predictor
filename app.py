@@ -9,7 +9,7 @@ from sklearn.preprocessing import LabelEncoder
 
 # Load dataset from GitHub repository
 github_url = "https://raw.githubusercontent.com/Lolzzz57489034/Airport-footfall-predictor/main/Airport_Flight_Data_Final_Updated.csv"
-df = pd.read_csv(Airport_Flight_Data_Final_Updated.csv)
+df = pd.read_csv(github_url)
 
 # Ensure 'Date' is in datetime format
 df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
@@ -30,6 +30,7 @@ label_encoders = {}
 categorical_cols = ["Season", "Weather_Good", "Economic_Trend", "Airport"]
 for col in categorical_cols:
     le = LabelEncoder()
+    df[col] = df[col].astype(str)  # Ensure it's string before encoding
     df[col] = le.fit_transform(df[col])
     label_encoders[col] = le
 
@@ -60,7 +61,8 @@ else:
     st.stop()
 
 # Dropdown for season selection
-selected_season = st.selectbox("Select Season:", ["Monsoon", "Summer", "Winter"])
+seasons = list(label_encoders["Season"].classes_)
+selected_season = st.selectbox("Select Season:", seasons)
 selected_season_encoded = label_encoders["Season"].transform([selected_season])[0]
 
 # Select future year
@@ -72,21 +74,24 @@ projected_footfall = st.number_input("Projected Footfall:", min_value=1000, max_
 
 # Predict button
 if st.button("\U0001F680 Predict"):
-    # Prepare input for prediction
-    input_data = np.array([[future_year, selected_airport_encoded, selected_season_encoded, 1, 1, projected_flights, projected_footfall]])
+    try:
+        # Prepare input for prediction
+        input_data = np.array([[future_year, selected_airport_encoded, selected_season_encoded, 1, 1, projected_flights, projected_footfall]])
+        
+        # Predict Revenue
+        predicted_revenue = model.predict(input_data)[0]
 
-    # Predict Revenue
-    predicted_revenue = model.predict(input_data)[0]
+        # Display Prediction
+        st.subheader(f"\U0001F4CA Predicted Revenue: *${predicted_revenue:,.2f}*")
 
-    # Display Prediction
-    st.subheader(f"\U0001F4CA Predicted Revenue: **${predicted_revenue:,.2f}**")
-
-    # Visualization
-    plt.figure(figsize=(8, 5))
-    sns.lineplot(x=df["Year"], y=df["Revenue"], marker="o", label="Past Revenue")
-    plt.axvline(x=future_year, color="r", linestyle="--", label="Prediction Point")
-    plt.scatter(future_year, predicted_revenue, color="red", s=100, label="Predicted Revenue")
-    plt.xlabel("Year")
-    plt.ylabel("Revenue ($)")
-    plt.legend()
-    st.pyplot(plt)
+        # Visualization
+        plt.figure(figsize=(8, 5))
+        sns.lineplot(x=df["Year"], y=df["Revenue"], marker="o", label="Past Revenue")
+        plt.axvline(x=future_year, color="r", linestyle="--", label="Prediction Point")
+        plt.scatter(future_year, predicted_revenue, color="red", s=100, label="Predicted Revenue")
+        plt.xlabel("Year")
+        plt.ylabel("Revenue ($)")
+        plt.legend()
+        st.pyplot(plt)
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
