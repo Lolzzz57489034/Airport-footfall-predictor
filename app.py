@@ -29,11 +29,12 @@ airport_names = [
 label_encoders = {}
 categorical_cols = ["Season", "Weather_Good", "Economic_Trend", "Airport"]
 for col in categorical_cols:
+    df[col] = df[col].astype(str)  # Ensure categorical data is string
     le = LabelEncoder()
     df[col] = le.fit_transform(df[col])
     label_encoders[col] = le
 
-# Create a synthetic revenue column (assumption: Revenue = Footfall * Avg Spending per Passenger)
+# Create a synthetic revenue column
 df["Revenue"] = df["Actual_Footfall"] * np.random.uniform(20, 50, size=len(df))
 
 # Prepare dataset for ML
@@ -53,14 +54,11 @@ st.title("\U0001F6EB Airport Footfall & Revenue Prediction")
 selected_airport = st.selectbox("Select Airport:", airport_names)
 
 # Map selected airport to encoded value
-if selected_airport in label_encoders["Airport"].classes_:
-    selected_airport_encoded = label_encoders["Airport"].transform([selected_airport])[0]
-else:
-    st.error("Selected airport not found in dataset!")
-    st.stop()
+selected_airport_encoded = label_encoders["Airport"].transform([selected_airport])[0]
 
 # Dropdown for season selection
-selected_season = st.selectbox("Select Season:", ["Monsoon", "Summer", "Winter"])
+seasons = list(label_encoders["Season"].classes_)
+selected_season = st.selectbox("Select Season:", seasons)
 selected_season_encoded = label_encoders["Season"].transform([selected_season])[0]
 
 # Predict Footfall for Next 10 Years
@@ -68,7 +66,7 @@ future_years = list(range(df["Year"].max() + 1, df["Year"].max() + 11))
 predicted_footfall_values = []
 for year in future_years:
     input_data = np.array([[year, selected_airport_encoded, selected_season_encoded, 1, 1, 1000]])
-    predicted_footfall = footfall_model.predict(input_data)[0]
+    predicted_footfall = footfall_model.predict(input_data.reshape(1, -1))[0]
     predicted_footfall_values.append(predicted_footfall)
 
 # Display Footfall Prediction Results
