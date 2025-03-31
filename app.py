@@ -4,7 +4,7 @@ import pandas as pd
 # Load dataset
 file_path = "Airport_Flight_Data_Final_Updated.csv"
 try:
-    df = pd.read_csv(file_path)
+    df = pd.read_csv(Airport_Flight_Data_Final_Updated.csv)
     
     # Extract unique values
     airports = df["Airport"].dropna().unique().tolist()
