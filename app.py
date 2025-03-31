@@ -1,21 +1,31 @@
-@st.cache_data
-def load_data():
-    df = pd.read_csv(file_path)
+import streamlit as st
+import pandas as pd
 
-    if "Date" not in df.columns:
-        st.error("Error: 'Date' column not found in the dataset.")
-        st.stop()
+# Load dataset to extract unique values for dropdowns
+file_path = "Airport_Flight_Data_Final_Updated.csv"
+df = pd.read_csv(file_path)
 
-    st.write("### First few values in 'Date' column:")
-    st.write(df["Date"].head(10))
+# Extract unique values
+airports = df["Airport"].unique().tolist()
+seasons = ["Summer", "Monsoon", "Winter"]
+flight_types = ["Domestic", "International"]
+years = sorted(df["Year"].unique().tolist())
+weekday_options = ["Weekday", "Weekend"]
 
-    st.write(f"Data type of 'Date' column: {df['Date'].dtype}")
+# Streamlit UI
+st.title("Airport Footfall Prediction")
+st.sidebar.header("Input Parameters")
 
-    df["Date"] = pd.to_datetime(df["Date"].str.strip(), errors="coerce")
+selected_airport = st.sidebar.selectbox("Select Airport:", airports)
+selected_season = st.sidebar.selectbox("Select Season:", seasons)
+selected_flight_type = st.sidebar.selectbox("Select Flight Type:", flight_types)
+selected_year = st.sidebar.slider("Select Year:", min_value=min(years), max_value=max(years), step=1)
+selected_weekday = st.sidebar.radio("Flight Day:", weekday_options)
 
-    st.write("### Rows where Date conversion failed:")
-    st.write(df[df["Date"].isna()].head(10))
-
-    df = df.dropna(subset=["Date"])  
-
-    return df
+# Display selected inputs
+st.write("### Selected Inputs")
+st.write(f"**Airport:** {selected_airport}")
+st.write(f"**Season:** {selected_season}")
+st.write(f"**Flight Type:** {selected_flight_type}")
+st.write(f"**Year:** {selected_year}")
+st.write(f"**Day Type:** {selected_weekday}")
