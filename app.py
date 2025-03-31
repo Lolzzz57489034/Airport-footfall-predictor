@@ -5,7 +5,10 @@ import pandas as pd
 file_path = "Airport_Flight_Data_Final_Updated.csv"  # Ensure the correct path
 @st.cache_data
 def load_data():
-    return pd.read_csv(file_path)
+    df = pd.read_csv(file_path)
+    df["Date"] = pd.to_datetime(df["Date"])  # Convert to datetime format
+    df["Year"] = df["Date"].dt.year  # Extract year
+    return df
 
 df = load_data()
 
@@ -38,7 +41,3 @@ st.write(f"**Airport:** {selected_airport}")
 st.write(f"**Season:** {selected_season}")
 st.write(f"**Flight Type:** {selected_flight_type}")
 st.write(f"**Year for Prediction:** {predicted_year}")
-
-st.write("Columns in dataset:", df.columns.tolist())
-
-
