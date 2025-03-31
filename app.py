@@ -38,3 +38,7 @@ st.write(f"**Airport:** {selected_airport}")
 st.write(f"**Season:** {selected_season}")
 st.write(f"**Flight Type:** {selected_flight_type}")
 st.write(f"**Year for Prediction:** {predicted_year}")
+
+st.write("Columns in dataset:", df.columns.tolist())
+
+
