@@ -1,9 +1,3 @@
-import streamlit as st
-import pandas as pd
-
-# Load dataset
-file_path = "Airport_Flight_Data_Final_Updated.csv"  # Ensure the correct path
-
 @st.cache_data
 def load_data():
     df = pd.read_csv(file_path)
@@ -13,9 +7,18 @@ def load_data():
         st.error("Error: 'Date' column not found in the dataset.")
         return None
 
-    # Print out first few values
+    # Print first few values for debugging
     st.write("### Sample values from 'Date' column:")
     st.write(df["Date"].head(10))
 
-    return df
+    # Try converting Date column
+    try:
+        df["Date"] = pd.to_datetime(df["Date"].str.strip(), format="%d/%m/%Y", errors="coerce")
+    except Exception as e:
+        st.error(f"Date conversion failed: {e}")
+        return None
 
+    # Remove rows with invalid dates
+    df = df.dropna(subset=["Date"])
+
+    return df
