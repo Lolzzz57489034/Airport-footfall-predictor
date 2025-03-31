@@ -1,81 +1,40 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
 
 # Load dataset
-file_path = "Airport_Flight_Data_Final_Updated.csv"  # Update if needed
-df = pd.read_csv(file_path)
+file_path = "Airport_Flight_Data_Final_Updated.csv"  # Ensure the correct path
+@st.cache_data
+def load_data():
+    return pd.read_csv(file_path)
 
-# Ensure "Year" column exists (or extract it from "Date")
-if "Year" not in df.columns:
-    if "Date" in df.columns:
-        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")  # Convert Date column to datetime
-        df["Year"] = df["Date"].dt.year  # Extract the Year
-    else:
-        st.error("Missing 'Year' or 'Date' column. Please check the dataset.")
-        st.stop()
+df = load_data()
 
-# Ensure required columns exist
-required_columns = {"Year", "Predicted_Footfall", "Actual_Footfall"}
-missing_columns = required_columns - set(df.columns)
+# Streamlit App Title
+st.title("Airport Footfall Prediction")
 
-if missing_columns:
-    st.error(f"Missing columns: {missing_columns}. Please check the dataset.")
-    st.stop()  # Stop execution if critical columns are missing
+# User Inputs
+st.sidebar.header("Select Parameters")
 
-# Drop rows with missing values
-df.dropna(subset=["Year", "Predicted_Footfall", "Actual_Footfall"], inplace=True)
+# Select Airport
+airports = df["Airport"].unique()
+selected_airport = st.sidebar.selectbox("Select Airport", airports)
 
-# Feature Engineering
-df["Footfall_Change"] = df["Actual_Footfall"].pct_change().fillna(0)
+# Select Season
+seasons = ["Summer", "Monsoon", "Winter"]
+selected_season = st.sidebar.selectbox("Select Season", seasons)
 
-# Verify "Footfall_Change" exists before using it
-if "Footfall_Change" not in df.columns:
-    st.error("Footfall_Change column could not be computed. Check data consistency.")
-    st.stop()
+# Select Flight Type
+flight_types = ["Domestic", "International"]
+selected_flight_type = st.sidebar.selectbox("Select Flight Type", flight_types)
 
-X = df[["Year", "Footfall_Change"]]
-y = df["Actual_Footfall"]
+# Select Year for Prediction
+min_year = df["Year"].min()
+max_year = df["Year"].max()
+predicted_year = st.sidebar.slider("Select Year for Prediction", min_year, max_year + 10, max_year + 1)
 
-# Train ML Model
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-model = RandomForestRegressor(n_estimators=100, random_state=42)
-model.fit(X_train, y_train)
-
-# Streamlit UI
-st.title("Airport Footfall Prediction Dashboard")
-
-tab1, tab2 = st.tabs(["📊 Historical Data", "🔮 Future Predictions"])
-
-with tab1:
-    st.subheader("Footfall Trends Over the Years")
-    fig, ax = plt.subplots(figsize=(10, 5))
-    sns.lineplot(x=df["Year"], y=df["Actual_Footfall"], marker="o", label="Actual Footfall", ax=ax)
-    sns.lineplot(x=df["Year"], y=df["Predicted_Footfall"], marker="o", label="Predicted Footfall", ax=ax)
-    ax.set_xlabel("Year")
-    ax.set_ylabel("Footfall Count")
-    ax.legend()
-    st.pyplot(fig)
-
-with tab2:
-    st.subheader("Future Footfall Prediction")
-    future_year = st.slider("Select a Future Year", int(df["Year"].max()) + 1, int(df["Year"].max()) + 10)
-    last_year_footfall = df.iloc[-1]["Actual_Footfall"]
-    predicted_growth = df["Footfall_Change"].mean()
-    predicted_footfall = last_year_footfall * (1 + predicted_growth) ** (future_year - df.iloc[-1]["Year"])
-    
-    st.write(f"**Predicted Footfall for {future_year}: {int(predicted_footfall)}**")
-    
-    # Plot past + future trends
-    future_years = np.arange(df["Year"].max(), future_year + 1)
-    future_predictions = [last_year_footfall * (1 + predicted_growth) ** (y - df.iloc[-1]["Year"]) for y in future_years]
-    
-    fig, ax = plt.subplots(figsize=(10, 5))
-    sns.lineplot(x=df["Year"], y=df["Actual_Footfall"], marker="o", label="Actual Footfall", ax=ax)
-    sns.lineplot(x=future_years, y=future_predictions, marker="o", linestyle="dashed", label="Predicted Footfall", ax=ax)
-    ax.axvline(x=future_year, color="red", linestyle="--", label="Prediction Point")
-    st.pyplot(fig)
+# Display Selected Parameters
+st.write("### Selected Parameters")
+st.write(f"**Airport:** {selected_airport}")
+st.write(f"**Season:** {selected_season}")
+st.write(f"**Flight Type:** {selected_flight_type}")
+st.write(f"**Year for Prediction:** {predicted_year}")
