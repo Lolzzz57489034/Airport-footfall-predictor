@@ -5,66 +5,54 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import LabelEncoder
 
-# Load dataset from GitHub repository
-github_url = "https://raw.githubusercontent.com/Lolzzz57489034/Airport-footfall-predictor/main/Airport_Flight_Data_Final_Updated.csv"
-df = pd.read_csv(github_url)
+# Load dataset
+file_path = "Airport_Flight_Data_Final_Updated.csv"  # Update if needed
+df = pd.read_csv(file_path)
 
-# Ensure 'Date' is in datetime format
-df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-df["Year"] = df["Date"].dt.year.fillna(df["Date"].dt.year.mode()[0]).astype(int)
+# Ensure data consistency
+df.dropna(subset=["Year", "Predicted_Footfall", "Actual_Footfall"], inplace=True)
 
-# Define airport names
-airport_names = df["Airport"].unique().tolist()
+# Feature Engineering
+df["Footfall_Change"] = df["Actual_Footfall"].pct_change().fillna(0)
+X = df[["Year", "Footfall_Change"]]
+y = df["Actual_Footfall"]
 
-# Encode categorical features
-label_encoders = {}
-categorical_cols = ["Season", "Weather_Good", "Economic_Trend", "Airport"]
-for col in categorical_cols:
-    df[col] = df[col].astype(str)
-    le = LabelEncoder()
-    df[col] = le.fit_transform(df[col])
-    label_encoders[col] = le
-
-# Train Footfall Prediction Model using both Actual and Predicted Footfall
-X_footfall = df[["Year", "Airport", "Season", "Weather_Good", "Economic_Trend", "Total_Flights", "Predicted_Footfall"]]
-y_footfall = df["Actual_Footfall"]
-X_train_footfall, X_test_footfall, y_train_footfall, y_test_footfall = train_test_split(X_footfall, y_footfall, test_size=0.2, random_state=42)
-footfall_model = RandomForestRegressor(n_estimators=100, random_state=42)
-footfall_model.fit(X_train_footfall, y_train_footfall)
+# Train ML Model
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+model = RandomForestRegressor(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
 
 # Streamlit UI
-st.set_page_config(page_title="Airport Footfall & Revenue Predictor", layout="wide")
-st.title("\U0001F6EB Airport Footfall Prediction")
+st.title("Airport Footfall Prediction Dashboard")
 
-# User Input Section
-selected_airport = st.selectbox("Select Airport:", airport_names)
-selected_season = st.selectbox("Select Season:", list(label_encoders["Season"].classes_))
-selected_year = st.slider("Select Year:", min_value=df["Year"].max() + 1, max_value=df["Year"].max() + 10, step=1)
+tab1, tab2 = st.tabs(["📊 Historical Data", "🔮 Future Predictions"])
 
-# Encode user selections
-selected_airport_encoded = label_encoders["Airport"].transform([selected_airport])[0]
-selected_season_encoded = label_encoders["Season"].transform([selected_season])[0]
+with tab1:
+    st.subheader("Footfall Trends Over the Years")
+    fig, ax = plt.subplots(figsize=(10, 5))
+    sns.lineplot(x=df["Year"], y=df["Actual_Footfall"], marker="o", label="Actual Footfall", ax=ax)
+    sns.lineplot(x=df["Year"], y=df["Predicted_Footfall"], marker="o", label="Predicted Footfall", ax=ax)
+    ax.set_xlabel("Year")
+    ax.set_ylabel("Footfall Count")
+    ax.legend()
+    st.pyplot(fig)
 
-# Predict Footfall using the trained model
-input_data = np.array([[selected_year, selected_airport_encoded, selected_season_encoded, 1, 1, 1000, df["Predicted_Footfall"].mean()]])
-predicted_footfall = footfall_model.predict(input_data.reshape(1, -1))[0]
-
-st.subheader(f"\U0001F4CA Predicted Footfall for {selected_year}: {int(predicted_footfall):,} Passengers")
-
-# Visualization
-future_years = list(range(df["Year"].max() + 1, df["Year"].max() + 11))
-predicted_footfall_values = []
-for year in future_years:
-    input_data = np.array([[year, selected_airport_encoded, selected_season_encoded, 1, 1, 1000, df["Predicted_Footfall"].mean()]])
-    footfall = footfall_model.predict(input_data.reshape(1, -1))[0]
-    predicted_footfall_values.append(footfall)
-
-# Plot Footfall Prediction
-plt.figure(figsize=(8, 5))
-sns.lineplot(x=future_years, y=predicted_footfall_values, marker="o", label="Predicted Footfall")
-plt.xlabel("Year")
-plt.ylabel("Passenger Footfall")
-plt.legend()
-st.pyplot(plt)
+with tab2:
+    st.subheader("Future Footfall Prediction")
+    future_year = st.slider("Select a Future Year", int(df["Year"].max()) + 1, int(df["Year"].max()) + 10)
+    last_year_footfall = df.iloc[-1]["Actual_Footfall"]
+    predicted_growth = df["Footfall_Change"].mean()
+    predicted_footfall = last_year_footfall * (1 + predicted_growth) ** (future_year - df.iloc[-1]["Year"])
+    
+    st.write(f"**Predicted Footfall for {future_year}: {int(predicted_footfall)}**")
+    
+    # Plot past + future trends
+    future_years = np.arange(df["Year"].max(), future_year + 1)
+    future_predictions = [last_year_footfall * (1 + predicted_growth) ** (y - df.iloc[-1]["Year"]) for y in future_years]
+    
+    fig, ax = plt.subplots(figsize=(10, 5))
+    sns.lineplot(x=df["Year"], y=df["Actual_Footfall"], marker="o", label="Actual Footfall", ax=ax)
+    sns.lineplot(x=future_years, y=future_predictions, marker="o", linestyle="dashed", label="Predicted Footfall", ax=ax)
+    ax.axvline(x=future_year, color="red", linestyle="--", label="Prediction Point")
+    st.pyplot(fig)
