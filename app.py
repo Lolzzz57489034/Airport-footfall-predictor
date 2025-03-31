@@ -10,6 +10,15 @@ from sklearn.ensemble import RandomForestRegressor
 file_path = "Airport_Flight_Data_Final_Updated.csv"  # Update if needed
 df = pd.read_csv(file_path)
 
+# Ensure "Year" column exists (or extract it from "Date")
+if "Year" not in df.columns:
+    if "Date" in df.columns:
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")  # Convert Date column to datetime
+        df["Year"] = df["Date"].dt.year  # Extract the Year
+    else:
+        st.error("Missing 'Year' or 'Date' column. Please check the dataset.")
+        st.stop()
+
 # Ensure required columns exist
 required_columns = {"Year", "Predicted_Footfall", "Actual_Footfall"}
 missing_columns = required_columns - set(df.columns)
@@ -18,10 +27,7 @@ if missing_columns:
     st.error(f"Missing columns: {missing_columns}. Please check the dataset.")
     st.stop()  # Stop execution if critical columns are missing
 
-# Convert Year to numeric (if not already)
-df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
-
-# Ensure no missing values in critical columns
+# Drop rows with missing values
 df.dropna(subset=["Year", "Predicted_Footfall", "Actual_Footfall"], inplace=True)
 
 # Feature Engineering
